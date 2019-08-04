@@ -18,12 +18,12 @@ import qualified Prelude as P((=<<))
 --
 -- * The law of associativity
 --   `∀f g x. g =<< (f =<< x) ≅ ((g =<<) . f) =<< x`
-class Applicative f => Monad f where
+class Applicative k => Monad k where
   -- Pronounced, bind.
   (=<<) ::
-    (a -> f b)
-    -> f a
-    -> f b
+    (a -> k b)
+    -> k a
+    -> k b
 
 infixr 1 =<<
 
@@ -36,8 +36,8 @@ instance Monad ExactlyOne where
     (a -> ExactlyOne b)
     -> ExactlyOne a
     -> ExactlyOne b
-  (=<<) =
-    error "todo: Course.Monad (=<<)#instance ExactlyOne"
+  (=<<) f (ExactlyOne a) = f a
+
 
 -- | Binds a function on a List.
 --
@@ -48,8 +48,9 @@ instance Monad List where
     (a -> List b)
     -> List a
     -> List b
-  (=<<) =
-    error "todo: Course.Monad (=<<)#instance List"
+  (=<<) _ Nil = Nil
+  (=<<) f (h :. t) = (f h) ++ (f =<< t)
+
 
 -- | Binds a function on an Optional.
 --
@@ -60,8 +61,9 @@ instance Monad Optional where
     (a -> Optional b)
     -> Optional a
     -> Optional b
-  (=<<) =
-    error "todo: Course.Monad (=<<)#instance Optional"
+  (=<<) _ Empty = Empty
+  (=<<) f (Full a) = f a
+
 
 -- | Binds a function on the reader ((->) t).
 --
@@ -72,8 +74,8 @@ instance Monad ((->) t) where
     (a -> ((->) t b))
     -> ((->) t a)
     -> ((->) t b)
-  (=<<) =
-    error "todo: Course.Monad (=<<)#instance ((->) t)"
+  (=<<) f g = (\t -> (f (g t) t))
+
 
 -- | Witness that all things with (=<<) and (<$>) also have (<*>).
 --
@@ -107,12 +109,12 @@ instance Monad ((->) t) where
 -- >>> ((*) <**> (+2)) 3
 -- 15
 (<**>) ::
-  Monad f =>
-  f (a -> b)
-  -> f a
-  -> f b
-(<**>) =
-  error "todo: Course.Monad#(<**>)"
+  Monad k =>
+  k (a -> b)
+  -> k a
+  -> k b
+(<**>) kf ka = kf <*> ka
+
 
 infixl 4 <**>
 
@@ -130,12 +132,11 @@ infixl 4 <**>
 -- >>> join (+) 7
 -- 14
 join ::
-  Monad f =>
-  f (f a)
-  -> f a
-join =
-  error "todo: Course.Monad#join"
-
+  Monad k =>
+  k (k a)
+  -> k a
+join kka = (\ka -> (\a -> return a) =<< ka)   =<< kka
+    
 -- | Implement a flipped version of @(=<<)@, however, use only
 -- @join@ and @(<$>)@.
 -- Pronounced, bind flipped.
@@ -143,12 +144,12 @@ join =
 -- >>> ((+10) >>= (*)) 7
 -- 119
 (>>=) ::
-  Monad f =>
-  f a
-  -> (a -> f b)
-  -> f b
-(>>=) =
-  error "todo: Course.Monad#(>>=)"
+  Monad k =>
+  k a
+  -> (a -> k b)
+  -> k b
+(>>=) ka akb = join (akb <$> ka)
+
 
 infixl 1 >>=
 
@@ -158,13 +159,12 @@ infixl 1 >>=
 -- >>> ((\n -> n :. n :. Nil) <=< (\n -> n+1 :. n+2 :. Nil)) 1
 -- [2,2,3,3]
 (<=<) ::
-  Monad f =>
-  (b -> f c)
-  -> (a -> f b)
+  Monad k =>
+  (b -> k c)
+  -> (a -> k b)
   -> a
-  -> f c
-(<=<) =
-  error "todo: Course.Monad#(<=<)"
+  -> k c
+(<=<) bkc akb a = bkc =<< (akb a)
 
 infixr 1 <=<
 
